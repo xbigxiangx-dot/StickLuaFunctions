@@ -1,5 +1,11 @@
 # StickLuaFunctions Changelog
 
+v0.8.2
+------
+## 工程与兼容性
+- WeiDU 安装程序新增简体中文和英文双语选择。
+
+
 v0.8.1
 ------
 ## 新增
