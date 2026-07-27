@@ -1,0 +1,127 @@
+# StickLuaFunctions Changelog
+
+v0.8.1
+------
+## 新增
+- Listener `ST_AddHideInPlainSightListener`：hook 随地潜行判定，输入参数为 `sprite`；监听器返回 `true` 时允许角色随地潜行。
+- 函数 `ST_GetAllKitIds(sprite, includeGeneralist)`：以表格形式返回角色的原始及额外 kit ID；默认排除通用法师，`includeGeneralist == true` 时将其包含在内。
+- Listener `ST_AddSaveModListener`：hook 豁免修正值计算，输入参数为 `sprite, effect`。
+
+## 变更
+- Hook `ST_RegisterHook_HideInPlainSight`：优化随地潜行判定 hook 的实现，并支持识别由 StickMultiKit 添加为额外宗派的影舞者。
+
+
+v0.8.0
+------
+## 新增
+- 函数 'ST_MatchIds(sprite, idsIndex, idsValue)'：按 IDS 类型匹配目标，支持 'ALIGN.IDS' 的 mask 判断，支持对额外 kidId 的判断。
+- 函数 'ST_MatchKitId(sprite, kitId)'：检测角色是否具有任何(包括额外的)符合输入的kitId。
+- 函数 'ST_SetExKitId(sprite, exKitIndex, kitId)'：将额外 kit ID 写入指定序号的角色本地变量，变量名格式为 'ST_ExKit#_High' 及 'ST_ExKit#_Low' (此处'#'等于exKitIndex)。
+- 函数 'ST_GetExKitId(sprite, exKitIndex)'：从角色本地变量读取指定序号的额外 kit ID。
+
+##工程与兼容性：
+- 2DA变量现在以 _2DA 作为后缀
+
+
+v0.7.0
+------
+## 新增
+- 函数 'ST_GetSprite(spriteOrId)'：将 'spriteId' 或 'sprite' 统一解析为 'sprite'，用于支持部分 hook 函数同时接受两类输入。
+- 函数 'ST_GetResRef(m_resRef)'：读取 resref 字符串。
+- 函数 'ST_ApplyWeaponHitEffects(sourceSprite, targetSprite, weaponRes, abilityIndex)'：应用武器 ability 携带的命中特效。
+- 函数 'ST_ApplyCriticalEffects(sourceSprite, targetSprite, hitOrMiss, weaponType)'：应用致命一击/致命失误条目中的 EFF 效果。
+- Listener 'ST_AddAttackDamModListener'：hook 物理攻击伤害修正值，输入参数为 'sourceSprite, targetSprite, damModified'，返回值可覆盖 'damModified'。
+- Listener 'ST_AddMeleeAttackListener'：hook 物理攻击命中后的场景，输入参数为 'sourceSprite, targetSprite, bBlocked'。
+- Listener 'ST_AddSaveDCModListener'：hook 法术/物品能力的豁免 DC 计算场景，输入参数为 'sprite, effect'。
+- 函数 'ST_RunMeleeAttackListeners(sourceSprite, targetSprite, bBlocked)'：统一执行通过 'ST_AddMeleeAttackListener' 注册的监听器，供真实攻击 hook 和模拟攻击等场景复用。
+
+## 变更
+- Listener 'ST_AddHitRollListener'：新增重骰处理机制。监听器返回正数时进行取高重骰，返回负数时进行取低重骰。
+- 全局状态 'st_currentAttack'：保存当前攻击者、目标、最终命中骰值（0-19）以及 'sourceTag'。
+- Listener 'ST_HitRollModListener' 更名为 'ST_HitModListener'，以更准确描述其功能。
+- 函数 'ST_GetCurrentWeapon(sprite, getCurrentAttack)'：当 'getCurrentAttack == true' 时，第二返回值改为 'fightingStyle'，第三返回值为 'isLeftAttack'。
+- 函数 'ST_GetCurrentWeapon(sprite, getCurrentAttack)'：当 'getCurrentAttack == false' 时，新增第四返回值 'isLeftAttack'。
+- 函数 'ST_FindEffectsAll(sprite, filter, firstOnly)'：当 'firstOnly == true' 时，按装备效果、限时效果、持久效果的顺序查找，找到后停止继续查找。
+- 函数 'ST_MockAttack'：扩展为可模拟近战/远程物理攻击；新增对命中骰、命中修正、伤害修正 hook 的调用；拆分致命一击与致命失误；新增 IDS 命中/伤害修正处理；模拟攻击完成后重置 'st_currentAttack.sourceTag'。
+- Listener 'ST_AddBackstabListeners' 更名为 'ST_AddBackstabListener'；背刺 hook 新增成功分支，监听器输入参数改为 'sourceSprite, targetSprite, isBackstabSuccessful'。失败分支中监听器返回 'true' 时，可强制进入背刺成功流程。
+
+
+v0.6.2-Alpha
+------------
+## 修复
+- 函数 'ST_MockAttack'：修正武器命中特效不生效的问题。
+- 函数 'ST_MockAttack'：修正一处提示文本错误。
+
+
+v0.6.1-Alpha
+------------
+## 修复
+- Listener 'ST_AddHitRollListener'：修正一个可能导致 'targetSprite' 读取错误的问题。
+
+
+v0.6.0-Alpha
+------------
+## 新增
+- 函数 'ST_HasState(sprite, state)'。
+
+
+## 变更
+- 函数 'ST_MockAttack'：新增近战攻击远程目标、远程攻击近距离目标带来的命中修正。
+- 函数 'ST_MockAttack'：新增隐形状态带来的命中修正。
+- 函数 'ST_MockAttack'：新增对致命失误修正值的处理能力。
+
+
+v0.5.0-Alpha
+------------
+## 新增
+- Listener 'ST_AddBackstabListeners'：hook 背刺场景，输入参数为 'sourceSprite, isBackstabSuccessful'；当前仅包含失败分支。
+
+## 变更
+- 函数 'ST_GetCurrentWeapon(sprite, getCurrentAttack)'：'getCurrentAttack' 未输入时默认为 'false'。
+- 函数 'ST_FindEffects(effectList, filter, firstOnly)'：'firstOnly' 未输入时默认为 'false'；为 'true' 时，找到第一个符合条件的 effect 后立即返回。
+
+
+v0.4.1-Alpha
+------------
+## 变更
+- 函数 'ST_MockAttack'：支持在不输入 'weaponRes' 的情况下运行。
+- 函数 'ST_MockAttack'：新增对多 ability 武器的处理能力。
+
+## 修复
+- 函数 'ST_MockAttack'：修正一处由 AC 类型导致的计算错误。
+
+
+v0.4.0-Alpha
+------------
+## 新增
+- Listener 'ST_AddButtonPressedListener'：hook 点击按钮，输入参数为 'buttonIndex'。
+
+
+v0.3.0-Alpha
+------------
+## 新增
+- 函数 'ST_ChangeMemorizedSpellNum(sprite, spellName, numToChange, spellType, spellLevel)'。
+
+## 变更
+- 函数 'ST_SpellNumMaxReset' 更名为 'ST_SetMemorizedSpellNumMax'，输入参数更改为 'sprite, spellName, numToSetMax, spellType, spellLevel'。
+- 函数 'ST_SpellNumReset' 更名为 'ST_SetMemorizedSpellNum'，输入参数更改为 'sprite, spellName, numToSet, spellType, spellLevel'。
+- 函数 'ST_SpellResReset' 更名为 'ST_ChangeMemorizedSpellNum'，输入参数更改为 'sprite, spellName, spellNameNew, spellType, spellLevel'。
+
+## 兼容性说明
+- 所有调用以上函数的功能都需要更新，以匹配新的函数名和输入参数。
+
+
+v0.2.0-Alpha
+------------
+## 新增
+- Listener 'ST_AddHitRollListener'：hook 命中骰产生，输入参数为 'sourceSprite, targetSprite, hitRoll'。
+
+## 变更
+- 函数 'ST_GetCurrentWeapon'：使用返回值 'fightingStyle' 统一描述所有武器风格。
+
+
+v0.1.0-Alpha
+------------
+## 新增
+- Hook 'ST_Hook_HideInPlainSight'：当 opcode#275 的 special 值为 1 时允许随地潜行。
+- 函数 'ST_GetCurrentWeapon'：新增返回值 'isSingleWeapon'。

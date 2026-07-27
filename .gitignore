@@ -1,0 +1,30 @@
+# Historical versions before v0.8.0
+/StickLuaFunctions_v0.0.0-Alpha/
+/StickLuaFunctions_v0.0.1-Alpha/
+/StickLuaFunctions_v0.0.2-Alpha/
+/StickLuaFunctions_v0.0.3-Alpha/
+/StickLuaFunctions_v0.0.4-Alpha/
+/StickLuaFunctions_v0.1.0-Alpha/
+/StickLuaFunctions_v0.2.0-Alpha/
+/StickLuaFunctions_v0.3.0-Alpha/
+/StickLuaFunctions_v0.4.0-Alpha/
+/StickLuaFunctions_v0.4.1-Alpha/
+/StickLuaFunctions_v0.5.0-Alpha/
+/StickLuaFunctions_v0.6.0-Alpha/
+/StickLuaFunctions_v0.6.1-Alpha/
+/StickLuaFunctions_v0.6.2-Alpha/
+/StickLuaFunctions_v0.7.0-Alpha/
+
+# Release archives
+/*.zip
+/*.7z
+/*.rar
+
+# Local editor and operating-system files
+/.idea/
+/.vscode/
+*.bak
+*.tmp
+Thumbs.db
+Desktop.ini
+
