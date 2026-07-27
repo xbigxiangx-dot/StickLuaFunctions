@@ -1,5 +1,11 @@
 # StickLuaFunctions Changelog
 
+## v0.8.2
+
+### Engineering and Compatibility
+
+- Added Simplified Chinese and English language options to the WeiDU installer.
+
 ## v0.8.1
 
 ### Added

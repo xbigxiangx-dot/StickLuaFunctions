@@ -12,6 +12,7 @@ StickLuaFunctions 是一个基于 EEex 的 Infinity Engine 增强版游戏模组
 
 - `StickLuaFunctions_v0.8.0-Alpha`
 - `StickLuaFunctions_v0.8.1-Alpha`
+- `StickLuaFunctions_v0.8.2-Alpha`
 
 更早的历史版本不收录在本仓库中。
 
@@ -39,6 +40,7 @@ This repository tracks releases starting with `v0.8.0-Alpha`:
 
 - `StickLuaFunctions_v0.8.0-Alpha`
 - `StickLuaFunctions_v0.8.1-Alpha`
+- `StickLuaFunctions_v0.8.2-Alpha`
 
 Earlier historical versions are not included in this repository.
 
