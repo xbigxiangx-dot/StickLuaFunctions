@@ -6,6 +6,8 @@
 
 StickLuaFunctions 是一个基于 EEex 的 Infinity Engine 增强版游戏模组，为其他模组提供可复用的 Lua 函数和 Hook Listener。
 
+> **兼容性说明：** 本项目不支持游戏版本 2.7。
+
 ### 收录版本
 
 本仓库从 `v0.8.0-Alpha` 开始维护：
@@ -33,6 +35,8 @@ StickLuaFunctions 是一个基于 EEex 的 Infinity Engine 增强版游戏模组
 ## English
 
 StickLuaFunctions is an EEex-based mod for Infinity Engine Enhanced Edition games. It provides reusable Lua functions and hook listeners for other mods.
+
+> **Compatibility notice:** Game version 2.7 is not supported.
 
 ### Included Versions
 
