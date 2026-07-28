@@ -26,7 +26,7 @@ StickLuaFunctions 是一个基于 EEex 的 Infinity Engine 增强版游戏模组
 
 ### 更新记录
 
-参见[中文更新记录](Changelog.txt)或 [English Changelog](CHANGELOG.en.md)。
+[更新记录](Changelog.txt)
 
 ### 许可证
 
@@ -56,7 +56,7 @@ Earlier historical versions are not included in this repository.
 
 ### Changelog
 
-See the [English changelog](CHANGELOG.en.md) or the [Chinese changelog](Changelog.txt).
+[Changelog](CHANGELOG.en.md)
 
 ### License
 
