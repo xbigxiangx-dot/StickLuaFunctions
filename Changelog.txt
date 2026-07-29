@@ -1,5 +1,12 @@
 # StickLuaFunctions Changelog
 
+v0.9.0
+------
+## 新增
+- Listener `ST_AddAttackIndexListener`：hook 物理攻击序号，输入参数为 `sourceSprite, targetSprite, attackIndex`。
+- opcode#1：`special = 1` 时增加副手攻击次数，`special = 0` 时增加该武器的攻击次数；仅对 `increment` 模式有效。
+
+
 v0.8.2
 ------
 ## 工程与兼容性

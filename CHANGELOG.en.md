@@ -1,5 +1,12 @@
 # StickLuaFunctions Changelog
 
+## v0.9.0
+
+### Added
+
+- Listener `ST_AddAttackIndexListener`: Hooks the physical attack index. The input parameters are `sourceSprite, targetSprite, attackIndex`.
+- Opcode 1: `special = 1` increases the number of off-hand attacks, while `special = 0` increases the number of attacks made with that weapon. Currently, only `increment` mode is supported.
+
 ## v0.8.2
 
 ### Engineering and Compatibility
