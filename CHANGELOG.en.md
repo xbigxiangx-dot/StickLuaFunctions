@@ -1,11 +1,31 @@
 # StickLuaFunctions Changelog
 
+## v0.10.0
+
+### Added
+
+- Listener `ST_AddAttackCancelListener`: Observes a pending physical attack action. Its inputs are `sourceSprite, targetSprite`; if any listener returns `true`, the attack action is prevented without changing the APR displayed on the character.
+- Listener `ST_AddAttackResultListener`: Observes the result of a physical attack. Its inputs are `sourceSprite, targetSprite, didHit`.
+- Listener `ST_AddCriticalHitModListener`: Modifies the value used by the engine for its critical-hit check. Its inputs are `sourceSprite, targetSprite, criticalHitMod`.
+- Listener `ST_AddCriticalHitMultiplierListener`: Modifies the critical-hit damage multiplier. Its inputs are `sourceSprite, targetSprite, multiplier`.
+- The Protection from Critical Hits feature now reduces the critical-hit multiplier by 1.
+- Opcode 301: When Attack Type is 5–9, it now modifies the critical-hit multiplier; the corresponding applicability conditions use Attack Type 0–4.
+
+### Changed
+
+- The global variable `st_currentAttack` stores the main-hand weapon, off-hand weapon, current attack weapon, fighting style, and off-hand attack state.
+
+### Fixed
+
+- Standardized the `ST_CriticalHitModListeners` table, loop, and registration function names.
+- Fixed branch handling in the physical attack result hook.
+
 ## v0.9.0
 
 ### Added
 
 - Listener `ST_AddAttackIndexListener`: Hooks the physical attack index. The input parameters are `sourceSprite, targetSprite, attackIndex`.
-- Opcode 1: `special = 1` increases the number of off-hand attacks, while `special = 0` increases the number of attacks made with that weapon. Currently, only `increment` mode is supported.
+- Opcode 1: `special = 1` increases the number of off-hand attacks, while `special = 2` increases the number of attacks made with that weapon. Currently, only `increment` mode is supported.
 
 ## v0.8.2
 
