@@ -1,10 +1,27 @@
 # StickLuaFunctions Changelog
 
+v0.10.0
+-------
+## 新增
+- Listener `ST_AddAttackCancelListener`：监听即将执行的物理攻击动作，输入参数为 `sourceSprite, targetSprite`；任一 Listener 返回 `true` 时阻止攻击行为发生，但不修改角色显示的每轮攻击次数。
+- Listener `ST_AddAttackResultListener`：监听物理攻击的命中结果，输入参数为 `sourceSprite, targetSprite, didHit`。
+- Listener `ST_AddCriticalHitModListener`：修改引擎用于重击判定的数值，输入参数为 `sourceSprite, targetSprite, criticalHitMod`。
+- Listener `ST_AddCriticalHitMultiplierListener`：修改重击伤害倍率，输入参数为 `sourceSprite, targetSprite, multiplier`。
+- '防护重击'功能的作用修改为重击倍率-1。
+- opcode#301：当 Attack Type = 5 ~ 9 时，改为修正重击倍数；其适用条件分别对应 Attack Type = 0 ~ 4。
+
+## 变更
+- 全局变量`st_currentAttack` 保存主手、副手、当前攻击武器、武器风格及是否为副手攻击。
+
+## 修复
+- 修正 `ST_CriticalHitModListeners` 的表名、循环及注册函数命名不一致问题。
+- 修正物理攻击结果 Hook 的分支处理。
+
 v0.9.0
 ------
 ## 新增
-- Listener `ST_AddAttackIndexListener`：hook 物理攻击序号，输入参数为 `sourceSprite, targetSprite, attackIndex`。
-- opcode#1：`special = 1` 时增加副手攻击次数，`special = 0` 时增加该武器的攻击次数；仅对 `increment` 模式有效。
+- Listener 'ST_AddAttackIndexListener'：hook 物理攻击序号，输入参数为 'sourceSprite, targetSprite, attackIndex'。
+- opcode#1：'special = 1' 时增加副手攻击次数，'special = 2' 时增加该武器的攻击次数；仅对 'increment' 模式有效。
 
 
 v0.8.2
@@ -16,12 +33,12 @@ v0.8.2
 v0.8.1
 ------
 ## 新增
-- Listener `ST_AddHideInPlainSightListener`：hook 随地潜行判定，输入参数为 `sprite`；监听器返回 `true` 时允许角色随地潜行。
-- 函数 `ST_GetAllKitIds(sprite, includeGeneralist)`：以表格形式返回角色的原始及额外 kit ID；默认排除通用法师，`includeGeneralist == true` 时将其包含在内。
-- Listener `ST_AddSaveModListener`：hook 豁免修正值计算，输入参数为 `sprite, effect`。
+- Listener 'ST_AddHideInPlainSightListener'：hook 随地潜行判定，输入参数为 'sprite'；监听器返回 'true' 时允许角色随地潜行。
+- 函数 'ST_GetAllKitIds(sprite, includeGeneralist)'：以表格形式返回角色的原始及额外 kit ID；默认排除通用法师，'includeGeneralist == true' 时将其包含在内。
+- Listener 'ST_AddSaveModListener'：hook 豁免修正值计算，输入参数为 'sprite, effect'。
 
 ## 变更
-- Hook `ST_RegisterHook_HideInPlainSight`：优化随地潜行判定 hook 的实现，并支持识别由 StickMultiKit 添加为额外宗派的影舞者。
+- Hook 'ST_RegisterHook_HideInPlainSight'：优化随地潜行判定 hook 的实现，并支持识别由 StickMultiKit 添加为额外宗派的影舞者。
 
 
 v0.8.0

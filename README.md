@@ -8,9 +8,9 @@ StickLuaFunctions 是一个基于 EEex 的 BG(2)EE 模组，为其他模组提�
 
 > **兼容性说明：** 本项目不支持游戏版本 2.7。
 
-### 最新版本：v0.9.0-Alpha
+### 最新版本：v0.10.0-Alpha
 
-[下载 v0.9.0-Alpha](https://github.com/xbigxiangx-dot/StickLuaFunctions/releases/tag/v0.9.0-Alpha)
+[下载 v0.10.0-Alpha](https://github.com/xbigxiangx-dot/StickLuaFunctions/releases/tag/v0.10.0-Alpha)
 
 ### 安装
 
@@ -32,9 +32,9 @@ StickLuaFunctions is an EEex-based mod for BG(2)EE. It provides reusable Lua fun
 
 > **Compatibility notice:** Game version 2.7 is not supported.
 
-### Latest Release: v0.9.0-Alpha
+### Latest Release: v0.10.0-Alpha
 
-[Download v0.9.0-Alpha](https://github.com/xbigxiangx-dot/StickLuaFunctions/releases/tag/v0.9.0-Alpha)
+[Download v0.10.0-Alpha](https://github.com/xbigxiangx-dot/StickLuaFunctions/releases/tag/v0.10.0-Alpha)
 
 ### Installation
 
