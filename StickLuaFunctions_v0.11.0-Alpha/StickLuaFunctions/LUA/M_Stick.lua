@@ -15,6 +15,84 @@ if not bit32 and bit then
         return bit.band(bit.rshift(n, field), bit.lshift(1, width) - 1)
     end
 end
+
+local versionHookAddress = EEex_Label("Hook-CAIGroup::IsPartyLeader()-Override")
+if versionHookAddress == 0x14011ABFA then
+	st_GameVersion = "2.6"
+elseif versionHookAddress == 0x14011AC1A then
+	st_GameVersion = "2.7"
+else
+	error(string.format(
+		"M_Stick: unsupported game version, version hook address = 0x%X",
+		versionHookAddress
+	))
+end
+
+local st_EngineAddress27 = {
+	[0x14039D837] = 0x14039DE77,
+	[0x14039D840] = 0x14039DE80,
+	[0x14039D9A3] = 0x14039DFE3,
+	[0x1403B9547] = 0x1403B9B87,
+	[0x1403B8439] = 0x1403B8A79,
+	[0x14039DAD5] = 0x14039E115,
+	[0x14039DFF4] = 0x14039E634,
+	[0x14038FEF0] = 0x140390530,
+	[0x14039E583] = 0x14039EBC3,
+	[0x14039E618] = 0x14039EC58,
+	[0x140390C72] = 0x1403912B2,
+	[0x1402633E1] = 0x140263641,
+	[0x140264B8F] = 0x140264DEF,
+	[0x14034C97D] = 0x14034CFBD,
+	[0x140390605] = 0x140390C45,
+	[0x1403906B0] = 0x140390CF0,
+	[0x1403906D2] = 0x140390D12,
+	[0x1403906D8] = 0x140390D18,
+	[0x140390748] = 0x140390D88,
+	[0x140390790] = 0x140390DD0,
+	[0x140390794] = 0x140390DD4,
+	[0x1403909B8] = 0x140390FF8,
+	[0x1403909B3] = 0x140390FF3,
+	[0x1405EA41D] = 0x1405EB7AD,
+	[0x14039074F] = 0x140390D8F,
+	[0x1403907A3] = 0x140390DE3,
+	[0x14024ED06] = 0x14024EF66,
+	[0x1401FB2F2] = 0x1401FB552,
+	[0x1401CD64B] = 0x1401CD85B,
+	[0x1402B8C7A] = 0x1402B92FA,
+	[0x1402C75C1] = 0x1402C7C41,
+	[0x1402BDC31] = 0x1402BE2B1,
+	[0x14039E8AF] = 0x14039EEEF,
+}
+
+function ST_RegisterEngineAddress(address26, address27)
+	local registeredAddress = st_EngineAddress27[address26]
+	if registeredAddress and registeredAddress ~= address27 then
+		error(string.format("M_Stick: conflicting 2.7 address for 0x%X", address26))
+	end
+	st_EngineAddress27[address26] = address27
+end
+
+function ST_GetEngineAddress(address26)
+	if st_GameVersion == "2.6" then
+		return address26
+	end
+
+	local address27 = st_EngineAddress27[address26]
+	if not address27 then
+		error(string.format("M_Stick: missing 2.7 address for 0x%X", address26))
+	end
+	return address27
+end
+
+EEex_DefineAssemblyLabel("ST_HideInPlainSight_Continue", ST_GetEngineAddress(0x14039D840))
+EEex_DefineAssemblyLabel("ST_HideInPlainSight_Fail", ST_GetEngineAddress(0x14039D9A3))
+EEex_DefineAssemblyLabel("ST_BackstabPosition_Continue", ST_GetEngineAddress(0x1403906D8))
+EEex_DefineAssemblyLabel("ST_BackstabTargetImmune_Continue", ST_GetEngineAddress(0x140390790))
+EEex_DefineAssemblyLabel("ST_BackstabInvisibilityInvalid", ST_GetEngineAddress(0x1403909B8))
+EEex_DefineAssemblyLabel("ST_BackstabPositionInvalid", ST_GetEngineAddress(0x1403909B3))
+EEex_DefineAssemblyLabel("ST_BackstabTargetImmune_String", ST_GetEngineAddress(0x1405EA41D))
+EEex_DefineAssemblyLabel("ST_BackstabTargetImmune", ST_GetEngineAddress(0x14039074F))
+
 --[[
 +----------+
 | 通用函数 |
@@ -326,8 +404,8 @@ function ST_MockAttack(sourceSprite, targetSprite, weaponRes, isLeftAttack, abil
 	local addDamStrBonus = bit32.extract(abilityFlags, 2) == 1
 
 	-- 致命一击修正
-	local criticalHitBonus = EEex_Sprite_GetStat(sourceSprite, 146)
-	local criticalMissBonus = 0
+	local criticalHitMod = EEex_Sprite_GetStat(sourceSprite, 146)
+	local criticalMissMod = 0
 	
 	local criticalEntryList = sourceSprite.m_derivedStats.m_cCriticalEntryList
 	local node = criticalEntryList.m_pNodeHead
@@ -336,12 +414,13 @@ function ST_MockAttack(sourceSprite, targetSprite, weaponRes, isLeftAttack, abil
 		if criticalEntry.m_hitOrMiss == 1 then	-- 0: hit, 1: miss
 			if criticalEntry.m_slot == -1 or ((criticalEntry.m_slot == 9) == isLeftAttack) then
 				if criticalEntry.m_attackType == 0 or criticalEntry.m_attackType == weaponType then
-					criticalMissBonus = criticalMissBonus + criticalEntry.m_bonus
+					criticalMissMod = criticalMissMod + criticalEntry.m_bonus
 				end
 			end
 		end
 		node = node.pNext
 	end
+	criticalHitMod = ST_Hook_CriticalHitMod(sourceSprite, targetSprite, criticalHitMod)	-- 调用Hook
 	
 	local hit = false
 	local criticalHit = false
@@ -352,9 +431,9 @@ function ST_MockAttack(sourceSprite, targetSprite, weaponRes, isLeftAttack, abil
 	
 	if ST_HasState(targetSprite, 'STATE_HELPLESS') then
 		hit = true
-	elseif hitRoll <= 1 + criticalMissBonus then
+	elseif hitRoll <= 1 + criticalMissMod then
 		criticalMiss = true
-	elseif hitRoll >= 20 - criticalHitBonus then
+	elseif hitRoll >= 20 - criticalHitMod then
 		hit = true
 		criticalHit = true
 	end
@@ -505,13 +584,7 @@ function ST_MockAttack(sourceSprite, targetSprite, weaponRes, isLeftAttack, abil
 				end
 				damModifier = damModifier + damStrBonus
 			end
-			
-			-- 武器类型修正，疑似包含在 m_DamageBonusRight 里，此处不计算
-			-- if weaponType == 1 then	-- 近战武器
-				-- damModifier = damModifier + EEex_Sprite_GetStat(sourceSprite, 167)	-- meleedamModifier
-			-- elseif weaponType == 2 then	-- 远程武器
-				-- damModifier = damModifier + EEex_Sprite_GetStat(sourceSprite, 168)	-- missiledamModifier
-			-- end	
+				
 			if itemType == 28 then	-- 徒手攻击
 				damModifier = damModifier + EEex_Sprite_GetStat(sourceSprite, 171)	-- fistdamModifier
 			end
@@ -543,6 +616,7 @@ function ST_MockAttack(sourceSprite, targetSprite, weaponRes, isLeftAttack, abil
 	
 	-- 致命一击是否被挡住
 	local criticalHitBlocked = false
+	local criticalHitMultiplier = 2
 	
 	if criticalHit and (not blocked) then
 		local equipmentArray = targetSprite.m_equipment.m_items	-- 读取装备序列
@@ -563,11 +637,13 @@ function ST_MockAttack(sourceSprite, targetSprite, weaponRes, isLeftAttack, abil
 					local toggleCriticalHitFlag = bit32.extract(itemFlags, 25) == 1
 					if isHeadGear ~= toggleCriticalHitFlag then
 						criticalHitBlocked = true
+						criticalHitMultiplier = criticalHitMultiplier - 1
 						break
 					end	
 				end
 			end
 		end
+		criticalHitMultiplier = ST_Hook_CriticalHitMultiplier(sourceSprite, targetSprite, criticalHitMultiplier)
 	end
 
 	-- 提示文本
@@ -614,7 +690,7 @@ function ST_MockAttack(sourceSprite, targetSprite, weaponRes, isLeftAttack, abil
 		if blocked then
 		else
 			if criticalHit then
-				damModified = damModified * 2
+				damModified = damModified * criticalHitMultiplier
 			end		
 			-- 伤害参数
 			local effectDamageType = {
@@ -636,7 +712,7 @@ function ST_MockAttack(sourceSprite, targetSprite, weaponRes, isLeftAttack, abil
 				})
 			
 			ST_ApplyWeaponHitEffects(sourceSprite, targetSprite, weaponRes, abilityIndex)
-			if criticalHit and (not criticalHitBlocked) then
+			if criticalHit then
 				ST_ApplyCriticalEffects(sourceSprite, targetSprite, 0, weaponType)
 			end	
 		end
@@ -651,7 +727,7 @@ function ST_MockAttack(sourceSprite, targetSprite, weaponRes, isLeftAttack, abil
 		ST_ApplyCriticalEffects(sourceSprite, targetSprite, 1, weaponType)
 	end
 	
-	st_currentAttack.sourceTag = nil	-- 模拟攻击已完成，重置 sourceTag
+	st_CurrentAttack.sourceTag = nil	-- 模拟攻击已完成，重置 sourceTag
 end
 
 function ST_ApplyWeaponHitEffects(sourceSprite, targetSprite, weaponRes, abilityIndex)
@@ -699,7 +775,8 @@ function ST_ApplyCriticalEffects(sourceSprite, targetSprite, hitOrMiss, weaponTy
 			if criticalEntry.m_slot == -1 or criticalEntry.m_slot == sourceSprite.m_equipment.m_selectedWeapon then
 				if criticalEntry.m_attackType == 0 or criticalEntry.m_attackType == weaponType then
 					local effect = EEex_Resource_Demand(ST_GetResRef(criticalEntry.m_res.m_resRef), 'EFF')
-					EEex_GameObject_ApplyEffect(targetSprite, {
+					if effect then
+						EEex_GameObject_ApplyEffect(targetSprite, {
 						["effectID"] = effect.effectID,
 						["effectList"] = 1,
 						["targetType"] = effect.targetType,
@@ -718,7 +795,8 @@ function ST_ApplyCriticalEffects(sourceSprite, targetSprite, hitOrMiss, weaponTy
 						['special'] = effect.special,
 						["sourceID"] = sourceSprite.m_id,
 						["sourceTarget"] = targetSprite.m_id,
-					})
+						})
+					end
 				end
 			end
 		end
@@ -987,7 +1065,7 @@ end
 +------------------+
 --]]
 function ST_RegisterHook_HideInPlainSight()
-	EEex_HookBeforeRestoreWithLabels(0x14039D837, 0, 0, 9, {
+	EEex_HookBeforeRestoreWithLabels(ST_GetEngineAddress(0x14039D837), 0, 0, 9, {
 		{"hook_integrity_watchdog_ignore_registers", {
 			EEex_HookIntegrityWatchdogRegister.RAX,
 		}},
@@ -1014,14 +1092,14 @@ function ST_RegisterHook_HideInPlainSight()
 				mov rax, qword ptr ss:[rsp+#SHADOW_SPACE_BOTTOM(-8)]
 				#DESTROY_SHADOW_SPACE(KEEP_ENTRY)
 				#MANUAL_HOOK_EXIT(1)
-				jmp 0x14039d840
+				jmp #L(ST_HideInPlainSight_Continue)
 
 				hide_fail:
 				#RESUME_SHADOW_ENTRY
 				mov rax, qword ptr ss:[rsp+#SHADOW_SPACE_BOTTOM(-8)]
 				#DESTROY_SHADOW_SPACE
 				#MANUAL_HOOK_EXIT(0)
-				jmp 0x14039D9A3
+				jmp #L(ST_HideInPlainSight_Fail)
 			]]},
 		})
 	)
@@ -1063,7 +1141,7 @@ end
 
 
 function ST_RegisterHook_AttackIndex()
-    EEex_HookBeforeRestoreWithLabels(0x1403B9547, 0, 8, 8, {
+    EEex_HookBeforeRestoreWithLabels(ST_GetEngineAddress(0x1403B9547), 0, 8, 8, {
         {"hook_integrity_watchdog_ignore_registers", {
             EEex_HookIntegrityWatchdogRegister.RAX, EEex_HookIntegrityWatchdogRegister.RCX, EEex_HookIntegrityWatchdogRegister.RDX,
             EEex_HookIntegrityWatchdogRegister.R8,  EEex_HookIntegrityWatchdogRegister.R9, EEex_HookIntegrityWatchdogRegister.R10,
@@ -1103,21 +1181,22 @@ local st_roundTimer = {}
 function ST_Hook_AttackIndex(sourceId, targetId, attackIndex)
 	local sourceSprite = EEex_GameObject_Get(sourceId)
 	local targetSprite = EEex_GameObject_Get(targetId)
+	local currentTime = EngineGlobals.g_pBaldurChitin.m_pObjectGame.m_worldTime.m_gameTime
 	
 	local isHasted  = ST_HasState(sourceSprite, 'STATE_HASTED')
 	
 	if not st_roundCounter[sourceId] then
 		st_roundCounter[sourceId] = 0
-		st_roundTimer[sourceId] = Infinity_GetGameTicks()
+		st_roundTimer[sourceId] = currentTime
 	elseif attackIndex == 1 then
 		st_roundCounter[sourceId] = st_roundCounter[sourceId] + 1
 	end
 	
-	local roundTime = isHasted and 2400 or 4800
-	if Infinity_GetGameTicks() - st_roundTimer[sourceId] >= roundTime then
+	local roundTime = isHasted and 45 or 90
+	if currentTime - st_roundTimer[sourceId] >= roundTime then
 		st_roundCounter[sourceId] = 0
 	end
-	st_roundTimer[sourceId] = Infinity_GetGameTicks()
+	st_roundTimer[sourceId] = currentTime
 
 
     for i = 1, #ST_AttackIndexListeners do
@@ -1207,7 +1286,7 @@ function ST_AddAttackIndexListener(func)
 end
 
 function ST_RegisterHook_AttackCancel()
-	EEex_HookBeforeRestoreWithLabels(0x1403B8439, 0, 9, 9, {
+	EEex_HookBeforeRestoreWithLabels(ST_GetEngineAddress(0x1403B8439), 0, 9, 9, {
 		{"hook_integrity_watchdog_ignore_registers", {
 			EEex_HookIntegrityWatchdogRegister.RAX, EEex_HookIntegrityWatchdogRegister.RCX, EEex_HookIntegrityWatchdogRegister.RDX,
 			EEex_HookIntegrityWatchdogRegister.R8, EEex_HookIntegrityWatchdogRegister.R9, EEex_HookIntegrityWatchdogRegister.R10,
@@ -1286,7 +1365,7 @@ end
 +--------------------+
 --]]
 function ST_RegisterHook_HitRoll()
-	EEex_HookAfterCallWithLabels(0x14039dad5, {
+	EEex_HookAfterCallWithLabels(ST_GetEngineAddress(0x14039DAD5), {
 		{"hook_integrity_watchdog_ignore_registers", {EEex_HookIntegrityWatchdogRegister.RAX}}},
 		EEex_FlattenTable({
 			{[[
@@ -1317,7 +1396,7 @@ function ST_RegisterHook_HitRoll()
 	)
 end
 
-st_currentAttack = {
+st_CurrentAttack = {
     sourceSprite = nil,
     targetSprite = nil,
     hitRoll = nil,
@@ -1327,24 +1406,29 @@ st_currentAttack = {
 	attackWeaponRes = nil,
 	isLeftAttack = false,
 	fightingStyle = nil,
+	backstabInvisibilityValid = true,
+	backstabPositionValid = true,
+	backstabTargetImmune = false,
+	backstabImmunityBypassed = false,
 }
 
 function ST_Hook_HitRoll(sourceSpriteOrId, targetSpriteOrId, hitRoll)	-- hitRoll 的取值范围是0-19，所以它会比游戏里显示的小1
-	-- print('sourceId:' .. sourceId)
-	-- print('targetId:' .. targetId)
-	-- print('hitRoll: ' .. hitRoll)
 	local sourceSprite = ST_GetSprite(sourceSpriteOrId)
 	local targetSprite = ST_GetSprite(targetSpriteOrId)
 	local reRollTokens = 0
 	local rightWeaponRes, leftWeaponRes, fightingStyle, isLeftAttack = ST_GetCurrentWeapon(sourceSprite, false)
 
-	st_currentAttack.sourceSprite = sourceSprite
-	st_currentAttack.targetSprite = targetSprite
-	st_currentAttack.rightWeaponRes = rightWeaponRes
-	st_currentAttack.leftWeaponRes = leftWeaponRes
-	st_currentAttack.attackWeaponRes = isLeftAttack and leftWeaponRes or rightWeaponRes
-	st_currentAttack.isLeftAttack = isLeftAttack
-	st_currentAttack.fightingStyle = fightingStyle
+	st_CurrentAttack.sourceSprite = sourceSprite
+	st_CurrentAttack.targetSprite = targetSprite
+	st_CurrentAttack.rightWeaponRes = rightWeaponRes
+	st_CurrentAttack.leftWeaponRes = leftWeaponRes
+	st_CurrentAttack.attackWeaponRes = isLeftAttack and leftWeaponRes or rightWeaponRes
+	st_CurrentAttack.isLeftAttack = isLeftAttack
+	st_CurrentAttack.fightingStyle = fightingStyle
+	st_CurrentAttack.backstabInvisibilityValid = true
+	st_CurrentAttack.backstabPositionValid = true
+	st_CurrentAttack.backstabTargetImmune = false
+	st_CurrentAttack.backstabImmunityBypassed = false
 	
     for i = 1, #ST_HitRollListeners do
         local listener = ST_HitRollListeners[i]
@@ -1363,7 +1447,7 @@ function ST_Hook_HitRoll(sourceSpriteOrId, targetSpriteOrId, hitRoll)	-- hitRoll
 		end
 	end
 	
-	st_currentAttack.hitRoll = hitRoll
+	st_CurrentAttack.hitRoll = hitRoll
 	return hitRoll
 end
 
@@ -1417,7 +1501,7 @@ end)
 +----------------------+
 --]]
 function ST_RegisterHook_HitMod()
-	EEex_HookAfterCallWithLabels(0x14039dff4, {
+	EEex_HookAfterCallWithLabels(ST_GetEngineAddress(0x14039DFF4), {
 		{"hook_integrity_watchdog_ignore_registers", {EEex_HookIntegrityWatchdogRegister.RAX}}},
 		EEex_FlattenTable({
 			{[[
@@ -1479,7 +1563,7 @@ end)
 +----------------------+
 --]]
 function ST_RegisterHook_AttackDamMod()
-	EEex_HookAfterCallWithLabels(0x14038fef0, {
+	EEex_HookAfterCallWithLabels(ST_GetEngineAddress(0x14038FEF0), {
 		{"hook_integrity_watchdog_ignore_registers", {EEex_HookIntegrityWatchdogRegister.RAX}}},
 		EEex_FlattenTable({
 			{[[
@@ -1533,15 +1617,15 @@ end
 | 致命一击阈值hook |
 +------------------+
 --]]
-function ST_RegisterHook_CriticalHitThreshold()
-	EEex_HookAfterCallWithLabels(0x14039E583, {
+function ST_RegisterHook_CriticalHitMod()
+	EEex_HookAfterCallWithLabels(ST_GetEngineAddress(0x14039E583), {
 		{"hook_integrity_watchdog_ignore_registers", {
 			EEex_HookIntegrityWatchdogRegister.RAX,
 			EEex_HookIntegrityWatchdogRegister.R10,
 		}}},
 		EEex_FlattenTable({
 			{[[
-				#MAKE_SHADOW_SPACE(32)
+				#MAKE_SHADOW_SPACE(56)
 				mov qword ptr ss:[rsp+#SHADOW_SPACE_BOTTOM(-8)], rax
 				mov r10d, eax
 			]]},
@@ -1576,8 +1660,6 @@ function ST_Hook_CriticalHitMod(sourceSpriteOrId, targetSpriteOrId, criticalHitM
 		end
 	end
 	
-	criticalHitMod = math.min(criticalHitMod, 20)
-	
 	return criticalHitMod
 end
 
@@ -1592,7 +1674,7 @@ end
 +--------------+
 --]]
 function ST_RegisterHook_CriticalHit()
-	EEex_HookAfterRestoreWithLabels(0x14039E618, 0, 7, 7, {
+	EEex_HookAfterRestoreWithLabels(ST_GetEngineAddress(0x14039E618), 0, 7, 7, {
 		{"hook_integrity_watchdog_ignore_registers", {
 			EEex_HookIntegrityWatchdogRegister.RAX,
 		}}},
@@ -1603,7 +1685,7 @@ function ST_RegisterHook_CriticalHit()
 		})
 	)
 
-	EEex_HookBeforeRestoreWithLabels(0x140390C72, 0, 8, 8, {
+	EEex_HookBeforeRestoreWithLabels(ST_GetEngineAddress(0x140390C72), 0, 8, 8, {
 		{"hook_integrity_watchdog_ignore_registers", {
 			EEex_HookIntegrityWatchdogRegister.RAX, EEex_HookIntegrityWatchdogRegister.RCX, EEex_HookIntegrityWatchdogRegister.RDX,
 			EEex_HookIntegrityWatchdogRegister.R8, EEex_HookIntegrityWatchdogRegister.R9, EEex_HookIntegrityWatchdogRegister.R10,
@@ -1637,11 +1719,11 @@ function ST_RegisterHook_CriticalHit()
 	)
 end
 
-function ST_Hook_CriticalHitMultiplier(sourceId, targetId, multiplier)
-	local sourceSprite = EEex_GameObject_Get(sourceId)
-	local targetSprite = EEex_GameObject_Get(targetId)
+function ST_Hook_CriticalHitMultiplier(sourceSpriteOrId, targetSpriteOrId, multiplier)
+	local sourceSprite = ST_GetSprite(sourceSpriteOrId)
+	local targetSprite = ST_GetSprite(targetSpriteOrId)
 
-	local isLeftAttack = st_currentAttack.isLeftAttack
+	local isLeftAttack = st_CurrentAttack.isLeftAttack
 
 	local criticalEntryList = sourceSprite.m_derivedStats.m_cCriticalEntryList
 	
@@ -1722,7 +1804,7 @@ end)
 +----------+
 --]]
 local function ST_RegisterHook_ButtonPressed()
-	EEex_HookBeforeRestoreWithLabels(0x1402633e1, 0, 8, 8, {
+	EEex_HookBeforeRestoreWithLabels(ST_GetEngineAddress(0x1402633E1), 0, 8, 8, {
 		{"hook_integrity_watchdog_ignore_registers", {
 			EEex_HookIntegrityWatchdogRegister.RAX, EEex_HookIntegrityWatchdogRegister.RDX, EEex_HookIntegrityWatchdogRegister.R8,
 			EEex_HookIntegrityWatchdogRegister.R9, EEex_HookIntegrityWatchdogRegister.R10, EEex_HookIntegrityWatchdogRegister.R11
@@ -1763,7 +1845,7 @@ end
 
 -- 动作栏按钮右键 hook
 local function ST_RegisterHook_RButtonPressed()
-	EEex_HookBeforeRestoreWithLabels(0x140264B8F, 0, 7, 7, {
+	EEex_HookBeforeRestoreWithLabels(ST_GetEngineAddress(0x140264B8F), 0, 7, 7, {
 		{"hook_integrity_watchdog_ignore_registers", {
 			EEex_HookIntegrityWatchdogRegister.RAX, EEex_HookIntegrityWatchdogRegister.RDX, EEex_HookIntegrityWatchdogRegister.R8,
 			EEex_HookIntegrityWatchdogRegister.R9, EEex_HookIntegrityWatchdogRegister.R10, EEex_HookIntegrityWatchdogRegister.R11
@@ -1807,7 +1889,7 @@ end
 +--------------------+
 --]]
 function ST_RegisterHook_HitStrMod()
-	EEex_HookAfterCallWithLabels(0x14034c97d, {
+	EEex_HookAfterCallWithLabels(ST_GetEngineAddress(0x14034C97D), {
 		{"hook_integrity_watchdog_ignore_registers", {
 			EEex_HookIntegrityWatchdogRegister.RAX, EEex_HookIntegrityWatchdogRegister.RDX, EEex_HookIntegrityWatchdogRegister.R8,
 			EEex_HookIntegrityWatchdogRegister.R9, EEex_HookIntegrityWatchdogRegister.R10, EEex_HookIntegrityWatchdogRegister.R11
@@ -1865,8 +1947,88 @@ end
 | 背刺hook |
 +----------+
 --]]
-function ST_RegisterHook_BackstabFail()	-- 因为目标免疫而背刺失败的分支，正常背刺不会进入此流程
-	EEex_HookBeforeRestoreWithLabels(0x140390748, 0, 7, 7, {
+-- A/B/C 通过 st_CurrentAttack 向 D 传递本次攻击的背刺条件状态。
+-- 每次命中骰开始和 Hook D 消费后都会恢复默认状态。
+local function ST_GenBackstabConditionLuaCall(luaFunction)
+	return EEex_FlattenTable({
+		{[[
+			#MAKE_SHADOW_SPACE(96)
+			mov qword ptr ss:[rsp+#SHADOW_SPACE_BOTTOM(-8)], rax
+			mov qword ptr ss:[rsp+#SHADOW_SPACE_BOTTOM(-16)], rcx
+			mov qword ptr ss:[rsp+#SHADOW_SPACE_BOTTOM(-24)], rdx
+			mov qword ptr ss:[rsp+#SHADOW_SPACE_BOTTOM(-32)], r8
+			mov qword ptr ss:[rsp+#SHADOW_SPACE_BOTTOM(-40)], r9
+			mov qword ptr ss:[rsp+#SHADOW_SPACE_BOTTOM(-48)], r10
+			mov qword ptr ss:[rsp+#SHADOW_SPACE_BOTTOM(-56)], r11
+		]]},
+		EEex_GenLuaCall(luaFunction),
+		{[[
+			call_error:
+			no_error:
+			mov r11, qword ptr ss:[rsp+#SHADOW_SPACE_BOTTOM(-56)]
+			mov r10, qword ptr ss:[rsp+#SHADOW_SPACE_BOTTOM(-48)]
+			mov r9, qword ptr ss:[rsp+#SHADOW_SPACE_BOTTOM(-40)]
+			mov r8, qword ptr ss:[rsp+#SHADOW_SPACE_BOTTOM(-32)]
+			mov rdx, qword ptr ss:[rsp+#SHADOW_SPACE_BOTTOM(-24)]
+			mov rcx, qword ptr ss:[rsp+#SHADOW_SPACE_BOTTOM(-16)]
+			mov rax, qword ptr ss:[rsp+#SHADOW_SPACE_BOTTOM(-8)]
+			#DESTROY_SHADOW_SPACE
+		]]},
+	})
+end
+
+-- Hook A：原本因“既未隐形，也没有 ASSASSINATE & 0x03”而跳转失败时，
+-- 记录缺少隐形并改为继续执行倍率判定。
+function ST_RegisterHook_BackstabInvisibilityInvalid()
+	EEex_HookConditionalJumpOnSuccessWithLabels(ST_GetEngineAddress(0x140390605), 0, {
+		{"hook_integrity_watchdog_ignore_registers", {
+			EEex_HookIntegrityWatchdogRegister.RAX, EEex_HookIntegrityWatchdogRegister.RDX, EEex_HookIntegrityWatchdogRegister.R8,
+			EEex_HookIntegrityWatchdogRegister.R9, EEex_HookIntegrityWatchdogRegister.R10, EEex_HookIntegrityWatchdogRegister.R11
+		}}},
+		EEex_FlattenTable({
+			ST_GenBackstabConditionLuaCall("ST_Hook_BackstabInvisibilityInvalid"),
+			{[[
+				jmp #L(jmp_fail)
+			]]},
+		})
+	)
+end
+
+function ST_Hook_BackstabInvisibilityInvalid()
+	st_CurrentAttack.backstabInvisibilityValid = false
+end
+
+local function ST_RegisterHook_BackstabPositionInvalid_At(address)
+	EEex_HookConditionalJumpWithLabels(address, 0, {
+		{"hook_integrity_watchdog_ignore_registers", {
+			EEex_HookIntegrityWatchdogRegister.RAX, EEex_HookIntegrityWatchdogRegister.RDX, EEex_HookIntegrityWatchdogRegister.R8,
+			EEex_HookIntegrityWatchdogRegister.R9, EEex_HookIntegrityWatchdogRegister.R10, EEex_HookIntegrityWatchdogRegister.R11
+		}}},
+		{},
+		EEex_FlattenTable({
+			ST_GenBackstabConditionLuaCall("ST_Hook_BackstabPositionInvalid"),
+			{[[
+				#MANUAL_HOOK_EXIT(1)
+				jmp #L(ST_BackstabPosition_Continue)
+			]]},
+		})
+	)
+end
+
+-- Hook B：模 16 朝向算法有两个位置失败出口，两处都需要转为记录后继续。
+function ST_RegisterHook_BackstabPositionInvalid()
+	ST_RegisterHook_BackstabPositionInvalid_At(ST_GetEngineAddress(0x1403906B0))
+	ST_RegisterHook_BackstabPositionInvalid_At(ST_GetEngineAddress(0x1403906D2))
+end
+
+function ST_Hook_BackstabPositionInvalid()
+	st_CurrentAttack.backstabPositionValid = false
+end
+
+-- Hook C：目标具有 IMMUNITY_TO_BACKSTAB 时记录免疫，然后跳到 Hook D。
+-- 是否真正绕过免疫由 Hook D 和监听器统一决定。
+function ST_RegisterHook_BackstabTargetImmune()
+	EEex_HookBeforeRestoreWithLabels(ST_GetEngineAddress(0x140390748), 0, 7, 7, {
 		{"hook_integrity_watchdog_ignore_registers", {
 			EEex_HookIntegrityWatchdogRegister.RAX, EEex_HookIntegrityWatchdogRegister.RDX, EEex_HookIntegrityWatchdogRegister.R8,
 			EEex_HookIntegrityWatchdogRegister.R9, EEex_HookIntegrityWatchdogRegister.R10, EEex_HookIntegrityWatchdogRegister.R11
@@ -1879,31 +2041,180 @@ function ST_RegisterHook_BackstabFail()	-- 因为目标免疫而背刺失败的�
 				mov r10d, dword ptr [rdi + 0x48]
 				mov r11d, dword ptr [r15 + 0x48]
 			]]},
-			EEex_GenLuaCall("ST_Hook_BackstabFail", {
+			EEex_GenLuaCall("ST_Hook_BackstabTargetImmune", {
 				["args"] = {
 					function(rspOffset) return {"mov qword ptr ss:[rsp+#$(1)], r10 #ENDL", {rspOffset}} end,
 					function(rspOffset) return {"mov qword ptr ss:[rsp+#$(1)], r11 #ENDL", {rspOffset}} end,
 				},
-				["returnType"] = EEex_LuaCallReturnType.Boolean,
 			}),
 			{[[
 				call_error:
 				
 				no_error:
-				
+						
 				mov r11, qword ptr ss:[rsp+#SHADOW_SPACE_BOTTOM(-16)]
 				mov r10, qword ptr ss:[rsp+#SHADOW_SPACE_BOTTOM(-8)]
-				cmp qword ptr [rsp + 56], 0x0
 				#DESTROY_SHADOW_SPACE
-				jnz 0x140390790
+				#MANUAL_HOOK_EXIT(0)
+				jmp #L(ST_BackstabTargetImmune_Continue)
 			]]},
 		})
 	)
 end
 
-function ST_RegisterHook_Backstab()	-- 背刺成功分支。失败分支Hook的返回值为true时也会进入此分支
-	EEex_HookAfterCallWithLabels(0x140390794, {
-		{"hook_integrity_watchdog_ignore_registers", {EEex_HookIntegrityWatchdogRegister.RAX}}},
+function ST_Hook_BackstabTargetImmune(sourceSpriteOrId, targetSpriteOrId)
+	st_CurrentAttack.backstabTargetImmune = true
+	local sourceSprite = ST_GetSprite(sourceSpriteOrId)
+	local targetSprite = ST_GetSprite(targetSpriteOrId)
+
+	for i = 1, #ST_BackstabTargetImmuneListeners do
+		if ST_BackstabTargetImmuneListeners[i](sourceSprite, targetSprite) == true then
+			st_CurrentAttack.backstabImmunityBypassed = true
+		end
+	end
+end
+
+ST_BackstabTargetImmuneListeners = {}
+function ST_AddBackstabTargetImmuneListener(func)
+	table.insert(ST_BackstabTargetImmuneListeners, func)
+end
+
+ST_AddBackstabTargetImmuneListener(function(sourceSprite, targetSprite)	-- opcode#263 special == 1 无视背刺免疫，但背刺倍数减半
+	local matchedEffects = ST_FindEffectsAll(sourceSprite, {m_effectId = 263, m_special = 1}, true)
+	if #matchedEffects > 0 then
+		return true
+	end
+end)
+
+-- Hook D：在原版武器合法性检查 call 后统一裁决 A/B/C 记录的缺失条件。
+function ST_RegisterHook_BackstabConditionDecision()
+	EEex_HookAfterCallWithLabels(ST_GetEngineAddress(0x140390794), {
+		{"hook_integrity_watchdog_ignore_registers", {
+			EEex_HookIntegrityWatchdogRegister.RAX, EEex_HookIntegrityWatchdogRegister.RDX, EEex_HookIntegrityWatchdogRegister.R8,
+			EEex_HookIntegrityWatchdogRegister.R9, EEex_HookIntegrityWatchdogRegister.R10, EEex_HookIntegrityWatchdogRegister.R11
+		}}},
+		EEex_FlattenTable({
+			{[[
+				#MAKE_SHADOW_SPACE(64)
+				mov qword ptr ss:[rsp+#SHADOW_SPACE_BOTTOM(-8)], r10
+				mov qword ptr ss:[rsp+#SHADOW_SPACE_BOTTOM(-16)], r11
+				mov qword ptr ss:[rsp+#SHADOW_SPACE_BOTTOM(-24)], rax
+				mov r10d, dword ptr [rdi + 0x48]
+				mov r11d, dword ptr [r15 + 0x48]
+				mov qword ptr ss:[rsp + 56], 0x0
+			]]},
+			EEex_GenLuaCall("ST_Hook_BackstabConditionDecision", {
+				["args"] = {
+					function(rspOffset) return {"mov qword ptr ss:[rsp+#$(1)], r10 #ENDL", {rspOffset}} end,
+					function(rspOffset) return {"mov qword ptr ss:[rsp+#$(1)], r11 #ENDL", {rspOffset}} end,
+				},
+				["returnType"] = EEex_LuaCallReturnType.Number,
+				["labelSuffix"] = "_decision",
+			}),
+			{[[
+				call_error_decision:
+				
+				no_error_decision:
+						
+				cmp qword ptr ss:[rsp + 56], 0x1
+				je allow_backstab
+				cmp qword ptr ss:[rsp + 56], 0x2
+				je target_immune
+				cmp qword ptr ss:[rsp + 56], 0x4
+				je position_invalid
+
+				invisibility_invalid:
+				mov r11, qword ptr ss:[rsp+#SHADOW_SPACE_BOTTOM(-16)]
+				mov r10, qword ptr ss:[rsp+#SHADOW_SPACE_BOTTOM(-8)]
+				#DESTROY_SHADOW_SPACE(KEEP_ENTRY)
+				#MANUAL_HOOK_EXIT(0)
+				jmp #L(ST_BackstabInvisibilityInvalid)
+
+				position_invalid:
+				#RESUME_SHADOW_ENTRY
+				mov r11, qword ptr ss:[rsp+#SHADOW_SPACE_BOTTOM(-16)]
+				mov r10, qword ptr ss:[rsp+#SHADOW_SPACE_BOTTOM(-8)]
+				#DESTROY_SHADOW_SPACE(KEEP_ENTRY)
+				#MANUAL_HOOK_EXIT(0)
+				jmp #L(ST_BackstabPositionInvalid)
+
+				target_immune:
+				#RESUME_SHADOW_ENTRY
+				mov r11, qword ptr ss:[rsp+#SHADOW_SPACE_BOTTOM(-16)]
+				mov r10, qword ptr ss:[rsp+#SHADOW_SPACE_BOTTOM(-8)]
+				#DESTROY_SHADOW_SPACE(KEEP_ENTRY)
+				mov rdx, #L(ST_BackstabTargetImmune_String)
+				#MANUAL_HOOK_EXIT(0)
+				jmp #L(ST_BackstabTargetImmune)
+				
+				allow_backstab:
+				#RESUME_SHADOW_ENTRY
+				mov rax, qword ptr ss:[rsp+#SHADOW_SPACE_BOTTOM(-24)]
+				mov r11, qword ptr ss:[rsp+#SHADOW_SPACE_BOTTOM(-16)]
+				mov r10, qword ptr ss:[rsp+#SHADOW_SPACE_BOTTOM(-8)]
+				#DESTROY_SHADOW_SPACE
+			]]},
+		})
+	)
+end
+
+-- Hook D：所有被 A/B/C 放行的缺失条件都在这里统一裁决。
+-- 监听器签名：listener(sourceSprite, targetSprite,
+-- invisibilityValid, positionValid, targetImmune) -> number/nil
+ST_BackstabConditionListeners = ST_BackstabConditionListeners or {}
+function ST_AddBackstabConditionListener(func)
+	table.insert(ST_BackstabConditionListeners, func)
+end
+
+function ST_Hook_BackstabConditionDecision(sourceSpriteOrId, targetSpriteOrId)
+	local sourceSprite = ST_GetSprite(sourceSpriteOrId)
+	local targetSprite = ST_GetSprite(targetSpriteOrId)
+	
+	local invisibilityValid = st_CurrentAttack.backstabInvisibilityValid
+	local positionValid = st_CurrentAttack.backstabPositionValid
+	local targetImmune = st_CurrentAttack.backstabTargetImmune
+	local immunityBypassed = st_CurrentAttack.backstabImmunityBypassed
+
+	local decisionValue = 0
+
+	for i = 1, #ST_BackstabConditionListeners do
+		local decision = ST_BackstabConditionListeners[i](
+			sourceSprite,
+			targetSprite,
+			invisibilityValid,
+			positionValid,
+			targetImmune,
+			immunityBypassed
+		)
+		if type(decision) == "number" then
+			decisionValue = decisionValue + decision
+		end
+	end
+
+	if decisionValue > 0 then
+		return 1
+	elseif decisionValue < 0 then
+		return 3
+	end
+
+	if not invisibilityValid then
+		return 3
+	elseif not positionValid then
+		return 4
+	elseif targetImmune and not immunityBypassed then
+		return 2
+	end
+
+	return 1
+end
+
+-- 原版武器 bit 22 检查通过后的共同落点；到这里才通知旧监听器背刺成功。
+function ST_RegisterHook_BackstabSuccess()
+	EEex_HookBeforeRestoreWithLabels(ST_GetEngineAddress(0x1403907A3), 0, 7, 7, {
+		{"hook_integrity_watchdog_ignore_registers", {
+			EEex_HookIntegrityWatchdogRegister.RAX, EEex_HookIntegrityWatchdogRegister.RDX, EEex_HookIntegrityWatchdogRegister.R8,
+			EEex_HookIntegrityWatchdogRegister.R9, EEex_HookIntegrityWatchdogRegister.R10, EEex_HookIntegrityWatchdogRegister.R11
+		}}},
 		EEex_FlattenTable({
 			{[[
 				#MAKE_SHADOW_SPACE(64)
@@ -1911,9 +2222,8 @@ function ST_RegisterHook_Backstab()	-- 背刺成功分支。失败分支Hook的�
 				mov qword ptr ss:[rsp+#SHADOW_SPACE_BOTTOM(-16)], r11
 				mov r10d, dword ptr [rdi + 0x48]
 				mov r11d, dword ptr [r15 + 0x48]
-
 			]]},
-			EEex_GenLuaCall("ST_Hook_Backstab", {
+			EEex_GenLuaCall("ST_Hook_BackstabSuccess", {
 				["args"] = {
 					function(rspOffset) return {"mov qword ptr ss:[rsp+#$(1)], r10 #ENDL", {rspOffset}} end,
 					function(rspOffset) return {"mov qword ptr ss:[rsp+#$(1)], r11 #ENDL", {rspOffset}} end,
@@ -1932,48 +2242,27 @@ function ST_RegisterHook_Backstab()	-- 背刺成功分支。失败分支Hook的�
 	)
 end
 
-function ST_Hook_BackstabFail(sourceId, targetId)
-	local sourceSprite = EEex_GameObject_Get(sourceId)
-	local targetSprite = EEex_GameObject_Get(targetId)
-	-- Infinity_DisplayString(Infinity_FetchString(sourceSprite.m_baseStats.m_name))
-	local forceBackstab = false
-	
-    for i = 1, #ST_BackstabListeners do
-        local listener = ST_BackstabListeners[i]
-        local toForceBackstab = listener(sourceSprite, targetSprite, false)
-		if toForceBackstab == true then
-			forceBackstab = true
-		end
-    end
-	
-	return forceBackstab
+function ST_Hook_BackstabSuccess(sourceSpriteOrId, targetSpriteOrId)
+	local sourceSprite = ST_GetSprite(sourceSpriteOrId)
+	local targetSprite = ST_GetSprite(targetSpriteOrId)
+
+	for i = 1, #ST_BackstabSuccessListeners do
+		ST_BackstabSuccessListeners[i](sourceSprite, targetSprite)
+	end
 end
 
-function ST_Hook_Backstab(sourceId, targetId)
-	local sourceSprite = EEex_GameObject_Get(sourceId)
-	local targetSprite = EEex_GameObject_Get(targetId)
-	-- Infinity_DisplayString(Infinity_FetchString(sourceSprite.m_baseStats.m_name))
-	
-    for i = 1, #ST_BackstabListeners do
-        local listener = ST_BackstabListeners[i]
-        local toForceBackstab = listener(sourceSprite, targetSprite, true)
-    end
+ST_BackstabSuccessListeners = {}
+function ST_AddBackstabSuccessListener(func)
+	table.insert(ST_BackstabSuccessListeners, func)
 end
 
-ST_BackstabListeners = {}
-function ST_AddBackstabListener(func)
-    table.insert(ST_BackstabListeners, func)
-end
-
-ST_AddBackstabListener(function(sourceSprite, targetSprite, backstabSuccess)	-- opcode#263 special == 1 无视背刺免疫，但背刺倍数减半
-	if not backstabSuccess then
-		local matchedEffects = ST_FindEffectsAll(sourceSprite, {m_effectId = 263, m_special = 1}, true)
-		if #matchedEffects > 0 then
-			sourceSprite.m_derivedStats.m_nBackstabDamageMultiplier = math.floor((sourceSprite.m_derivedStats.m_nBackstabDamageMultiplier + 1) / 2)
-			return true
-		end
+ST_AddBackstabSuccessListener(function(sourceSprite, targetSprite)	-- 绕过背刺免疫后，背刺倍数减半
+	if st_CurrentAttack.backstabTargetImmune and st_CurrentAttack.backstabImmunityBypassed then
+		sourceSprite.m_derivedStats.m_nBackstabDamageMultiplier = math.floor((sourceSprite.m_derivedStats.m_nBackstabDamageMultiplier + 1) / 2)
 	end
 end)
+
+
 --[[
 +-------------+
 | 法术DC Hook |
@@ -2010,8 +2299,8 @@ end
 
 function ST_RegisterHook_SaveDCMod()
 	for _, address in ipairs({
-		0x14024ed06, -- 常规施法
-		0x1401fb2f2, -- 物品能力
+		ST_GetEngineAddress(0x14024ED06), -- 常规施法
+		ST_GetEngineAddress(0x1401FB2F2), -- 物品能力
 	}) do
 		ST_RegisterHook_SaveDCMod_At(address)
 	end
@@ -2067,7 +2356,7 @@ end
 +--------------+
 --]]
 function ST_RegisterHook_SaveMod()
-	EEex_HookAfterCallWithLabels(0x1401CD64B, {
+	EEex_HookAfterCallWithLabels(ST_GetEngineAddress(0x1401CD64B), {
 		{"hook_integrity_watchdog_ignore_registers", {
 			EEex_HookIntegrityWatchdogRegister.RAX, EEex_HookIntegrityWatchdogRegister.RDX, EEex_HookIntegrityWatchdogRegister.R8,
 			EEex_HookIntegrityWatchdogRegister.R9, EEex_HookIntegrityWatchdogRegister.R10, EEex_HookIntegrityWatchdogRegister.R11
@@ -2150,7 +2439,7 @@ charGenSprite = nil
 charGenClassId = 0
 
 function ST_RegisterHook_CharGenClassDone()
-	EEex_HookAfterCallWithLabels(0x1402b8c7a, {
+	EEex_HookAfterCallWithLabels(ST_GetEngineAddress(0x1402B8C7A), {
 		{"hook_integrity_watchdog_ignore_registers", {
 			EEex_HookIntegrityWatchdogRegister.RAX, EEex_HookIntegrityWatchdogRegister.RDX, EEex_HookIntegrityWatchdogRegister.R8,
 			EEex_HookIntegrityWatchdogRegister.R9, EEex_HookIntegrityWatchdogRegister.R10, EEex_HookIntegrityWatchdogRegister.R11
@@ -2220,7 +2509,7 @@ end
 --]]
 
 function ST_RegisterHook_ProficiencyUIMax()
-	EEex_HookBeforeRestoreWithLabels(0x1402C75C1, 0, 8, 8, {
+	EEex_HookBeforeRestoreWithLabels(ST_GetEngineAddress(0x1402C75C1), 0, 8, 8, {
 		{"hook_integrity_watchdog_ignore_registers", {
 			EEex_HookIntegrityWatchdogRegister.RAX, EEex_HookIntegrityWatchdogRegister.RCX, EEex_HookIntegrityWatchdogRegister.RDX,
 			EEex_HookIntegrityWatchdogRegister.R8, EEex_HookIntegrityWatchdogRegister.R9, EEex_HookIntegrityWatchdogRegister.R10,
@@ -2259,7 +2548,7 @@ function ST_RegisterHook_ProficiencyUIMax()
 end
 
 function ST_RegisterHook_ProficiencyActualMax()
-	EEex_HookBeforeRestoreWithLabels(0x1402BDC31, 0, 8, 8, {
+	EEex_HookBeforeRestoreWithLabels(ST_GetEngineAddress(0x1402BDC31), 0, 8, 8, {
 		{"hook_integrity_watchdog_ignore_registers", {
 			EEex_HookIntegrityWatchdogRegister.RAX, EEex_HookIntegrityWatchdogRegister.RCX, EEex_HookIntegrityWatchdogRegister.RDX,
 			EEex_HookIntegrityWatchdogRegister.R8, EEex_HookIntegrityWatchdogRegister.R9, EEex_HookIntegrityWatchdogRegister.R10,
@@ -2376,7 +2665,7 @@ end
 --]]
 function ST_RegisterHook_AttackResult()
 	-- Hook the original `je` directly so EEex rebuilds its relative target.
-	EEex_HookBeforeConditionalJumpWithLabels(0x14039E8AF, 0, {
+	EEex_HookBeforeConditionalJumpWithLabels(ST_GetEngineAddress(0x14039E8AF), 0, {
 		{"hook_integrity_watchdog_ignore_registers", {
 			EEex_HookIntegrityWatchdogRegister.RAX, EEex_HookIntegrityWatchdogRegister.RCX, EEex_HookIntegrityWatchdogRegister.RDX,
 			EEex_HookIntegrityWatchdogRegister.R8, EEex_HookIntegrityWatchdogRegister.R9, EEex_HookIntegrityWatchdogRegister.R10,
@@ -2420,8 +2709,8 @@ function ST_RegisterHook_AttackResult()
 end
 
 function ST_Hook_AttackResult(hit)
-	local sourceSprite = st_currentAttack.sourceSprite
-	local targetSprite = st_currentAttack.targetSprite
+	local sourceSprite = st_CurrentAttack.sourceSprite
+	local targetSprite = st_CurrentAttack.targetSprite
 	if sourceSprite == nil or targetSprite == nil then
 		return
 	end
@@ -2453,7 +2742,7 @@ ST_RegisterHook_AttackCancel()
 ST_RegisterHook_HitRoll()
 ST_RegisterHook_HitMod()
 ST_RegisterHook_AttackDamMod()
-ST_RegisterHook_CriticalHitThreshold()	-- bug
+ST_RegisterHook_CriticalHitMod()
 ST_RegisterHook_CriticalHit()
 ST_RegisterHook_AttackResult()
 
@@ -2461,9 +2750,16 @@ ST_RegisterHook_ButtonPressed()
 ST_RegisterHook_RButtonPressed()
 
 -- ST_RegisterHook_HitStrMod()
-ST_RegisterHook_BackstabFail()
-ST_RegisterHook_Backstab()
+
+ST_RegisterHook_BackstabInvisibilityInvalid()
+ST_RegisterHook_BackstabPositionInvalid()
+ST_RegisterHook_BackstabTargetImmune()
+ST_RegisterHook_BackstabConditionDecision()
+ST_RegisterHook_BackstabSuccess()
 
 ST_RegisterHook_SaveDCMod()
 ST_RegisterHook_SaveMod()
 EEex_EnableCodeProtection()
+
+
+

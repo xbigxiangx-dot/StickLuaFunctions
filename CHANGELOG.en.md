@@ -1,5 +1,21 @@
 # StickLuaFunctions Changelog
 
+## v0.11.0
+
+### Added
+
+- Added support for game version 2.7. The game version is detected as 2.6 or 2.7 at startup, and all engine hooks use the corresponding addresses.
+- Listener `ST_AddBackstabTargetImmuneListener`: Hooks the target's backstab-immunity check. Its inputs are `sourceSprite, targetSprite`; returning `true` bypasses the target's backstab immunity.
+- Listener `ST_AddBackstabConditionListener`: Hooks backstab condition resolution. Its inputs are `sourceSprite, targetSprite, invisibilityValid, positionValid, targetImmune, immunityBypassed`; a positive return value forces the backstab to be allowed, while a negative value forces it to be denied.
+- Listener `ST_AddBackstabSuccessListener`: Hooks attacks that successfully enter the backstab path. Its inputs are `sourceSprite, targetSprite`.
+
+### Changed
+
+- Renamed the global attack-state variable `st_currentAttack` to `st_CurrentAttack` and added backstab invisibility, positioning, target-immunity, and immunity-bypass states.
+- Refactored the backstab hooks to track invisibility, positioning, and target immunity separately and resolve listener results in a single decision stage.
+- Split `ST_AddBackstabListener` into `ST_AddBackstabTargetImmuneListener`, `ST_AddBackstabConditionListener`, and `ST_AddBackstabSuccessListener`.
+- `ST_MockAttack` now invokes the critical-hit modifier and critical-hit multiplier listeners and calculates damage using the modified multiplier.
+
 ## v0.10.0
 
 ### Added

@@ -1,5 +1,20 @@
 # StickLuaFunctions Changelog
 
+v0.11.0
+-------
+## 新增
+- 新增对游戏 2.7 版本的支持；启动时自动识别 2.6 或 2.7，并为所有引擎 Hook 使用对应版本的地址。
+- Listener `ST_AddBackstabTargetImmuneListener`：监听目标的背刺免疫判定，输入参数为 `sourceSprite, targetSprite`；返回 `true` 时绕过目标的背刺免疫。
+- Listener `ST_AddBackstabConditionListener`：监听背刺条件裁决，输入参数为 `sourceSprite, targetSprite, invisibilityValid, positionValid, targetImmune, immunityBypassed`；返回正数时强制允许背刺，返回负数时强制禁止背刺。
+- Listener `ST_AddBackstabSuccessListener`：监听成功进入背刺流程的攻击，输入参数为 `sourceSprite, targetSprite`。
+
+## 变更
+- 全局攻击状态变量 `st_currentAttack` 更名为 `st_CurrentAttack`，并新增背刺隐形、站位、目标免疫及免疫绕过状态。
+- 重构背刺 Hook，分别记录隐形、站位和目标免疫条件，并在统一的裁决阶段处理 Listener 返回值。
+- Listener `ST_AddBackstabListener` 拆分为 `ST_AddBackstabTargetImmuneListener`、`ST_AddBackstabConditionListener` 和 `ST_AddBackstabSuccessListener`。
+- `ST_MockAttack` 现在会调用重击判定修正及重击倍率 Listener，并按照修正后的重击倍率计算伤害。
+
+
 v0.10.0
 -------
 ## 新增
