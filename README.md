@@ -6,11 +6,11 @@
 
 StickLuaFunctions is an EEex-based mod for BG(2)EE. It provides reusable Lua functions and hook listeners for other mods.
 
-> **Compatibility notice:** Game version 2.7 is not supported.
+> **Compatibility:** Game versions 2.6 and 2.7 are supported.
 
-### Latest Release: v0.10.0-Alpha
+### Latest Release: v0.11.0-Alpha
 
-[Download v0.10.0-Alpha](https://github.com/xbigxiangx-dot/StickLuaFunctions/releases/tag/v0.10.0-Alpha)
+[Download v0.11.0-Alpha](https://github.com/xbigxiangx-dot/StickLuaFunctions/releases/tag/v0.11.0-Alpha)
 
 ### Installation
 
@@ -30,11 +30,11 @@ This project is licensed under the [MIT License](LICENSE).
 
 StickLuaFunctions 是一个基于 EEex 的 BG(2)EE 模组，为其他模组提供可复用的 Lua 函数和 Hook Listener。
 
-> **兼容性说明：** 本项目不支持游戏版本 2.7。
+> **兼容性：** 支持游戏版本 2.6 和 2.7。
 
-### 最新版本：v0.10.0-Alpha
+### 最新版本：v0.11.0-Alpha
 
-[下载 v0.10.0-Alpha](https://github.com/xbigxiangx-dot/StickLuaFunctions/releases/tag/v0.10.0-Alpha)
+[下载 v0.11.0-Alpha](https://github.com/xbigxiangx-dot/StickLuaFunctions/releases/tag/v0.11.0-Alpha)
 
 ### 安装
 

@@ -1,0 +1,3 @@
+// LUA文件
+
+COPY ~%MOD_FOLDER%\LUA\M_Stick.lua~ ~Override~
